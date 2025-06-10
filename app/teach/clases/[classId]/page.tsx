@@ -1,21 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation"; // Import useParams
 
 interface ClassDetailPageProps {
   params: {
-    classId: string; // Recibe el nombre de la clase (slug)
+    classId: string; // We no longer directly access params.classId, instead we use useParams
   };
 }
 
-export default function ClassDetailPage({ params }: ClassDetailPageProps) {
+export default function ClassDetailPage() {
+  const params = useParams(); // Unwrap the classId parameter using useParams
+  const classId = params?.classId as string | undefined; // Type assertion to safely extract classId
   const [classDetail, setClassDetail] = useState<any>(null); // Almacena los detalles de la clase
   const [students, setStudents] = useState<any[]>([]); // Almacena los estudiantes
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
-  const [classroomId, setClassroomId] = useState<string | null>(null); // Para almacenar el classroom_id
 
   useEffect(() => {
+    if (!classId) {
+      setError("Clase no encontrada.");
+      setLoading(false);
+      return;
+    }
+
     const fetchClassDetail = async () => {
       try {
         const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
@@ -46,14 +54,12 @@ export default function ClassDetailPage({ params }: ClassDetailPageProps) {
               .replace(/ó/g, "o")
               .replace(/ú/g, "u")
               .replace(/ñ/g, "n")
-              .replace(/\s+/g, "-") === params.classId
+              .replace(/\s+/g, "-") === classId // Use classId from params
         );
 
         if (!classFound) {
           throw new Error("Clase no encontrada.");
         }
-
-        setClassroomId(classFound.classroom_id); // Guardamos el classroom_id
 
         // Obtener detalles de la clase usando classroom_id
         const resClass = await fetch(
@@ -94,7 +100,7 @@ export default function ClassDetailPage({ params }: ClassDetailPageProps) {
     };
 
     fetchClassDetail();
-  }, [params.classId]); // Actualiza cuando el 'classId' cambie
+  }, [classId]); // Actualiza cuando el 'classId' cambie
 
   if (loading) return <p>Cargando...</p>;
 
@@ -111,7 +117,7 @@ export default function ClassDetailPage({ params }: ClassDetailPageProps) {
       {/* Mosaico de estudiantes */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
         {students.map((student: any) => (
-          <div key={student.user_id} className="border rounded-lg p-4">
+          <div key={student.user_id} className="border rounded-lg p-4 border-gray-300 rounded-md text-gray-700 hover:bg-gray-100">
             <h3 className="text-lg font-semibold text-gray-900">
               {student.name} {student.lastName}
             </h3>

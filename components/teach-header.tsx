@@ -8,8 +8,12 @@ import { usePathname } from "next/navigation"; // Import usePathname
 export function TeachHeader() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [pathname, setPathname] = useState<string | null>(null); // State to store the pathname
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const pathname = usePathname(); // Get the pathname
+
+  useEffect(() => {
+    setPathname(window.location.pathname); // Update pathname once the component is mounted
+  }, []); // Empty dependency array to run only once on mount
 
   // Extract the classId from the pathname, assuming it's in the format /teach/clases/[classId]
   const classId = pathname?.split("/").pop() || null;
