@@ -4,7 +4,11 @@ import { useState, useRef, useEffect } from "react";
 import { UserCircleIcon } from "@heroicons/react/24/outline";
 import { AccountSettingsModal } from "./account-settings-modal";
 
-export function TeachHeader() {
+interface TeachHeaderProps {
+  className: string; // Recibe el nombre de la clase actual
+}
+
+export function TeachHeader({ className }: TeachHeaderProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -44,7 +48,7 @@ export function TeachHeader() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-gray-900">
-              Clase: Álgebra
+              Clase: {className}
             </h1>
           </div>
 
