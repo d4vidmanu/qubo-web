@@ -117,7 +117,7 @@ export default function ClassDetailPage() {
       {/* Mosaico de estudiantes */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
         {students.map((student: any) => (
-          <div key={student.user_id} className="border rounded-lg p-4 border-gray-300 rounded-md text-gray-700 hover:bg-gray-100">
+          <div key={student.user_id} className="border rounded-lg p-4 border-gray-300 text-gray-700 hover:bg-gray-100">
             <h3 className="text-lg font-semibold text-gray-900">
               {student.name} {student.lastName}
             </h3>
