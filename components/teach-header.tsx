@@ -1,43 +1,51 @@
-"use client"
+"use client";
 
-import { useState, useRef, useEffect } from "react"
-import { UserCircleIcon } from "@heroicons/react/24/outline"
-import { AccountSettingsModal } from "./account-settings-modal"
+import { useState, useRef, useEffect } from "react";
+import { UserCircleIcon } from "@heroicons/react/24/outline";
+import { AccountSettingsModal } from "./account-settings-modal";
 
 export function TeachHeader() {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false)
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
       }
     }
-
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [])
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleAccountSettings = () => {
-    setIsDropdownOpen(false)
-    setIsAccountModalOpen(true)
-  }
+    setIsDropdownOpen(false);
+    setIsAccountModalOpen(true);
+  };
 
   const handleLogout = () => {
-    setIsDropdownOpen(false)
-    window.location.href = "/"
-  }
+    setIsDropdownOpen(false);
+
+    // Eliminar cookies de auth
+    document.cookie = "token=; path=/; max-age=0";
+    document.cookie = "user_id=; path=/; max-age=0";
+
+    // Redirigir al home o login
+    window.location.href = "/";
+  };
 
   return (
     <>
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Clase: Álgebra</h1>
+            <h1 className="text-xl font-semibold text-gray-900">
+              Clase: Álgebra
+            </h1>
           </div>
 
           <div className="relative" ref={dropdownRef}>
@@ -68,7 +76,10 @@ export function TeachHeader() {
         </div>
       </header>
 
-      <AccountSettingsModal isOpen={isAccountModalOpen} onClose={() => setIsAccountModalOpen(false)} />
+      <AccountSettingsModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+      />
     </>
-  )
+  );
 }
