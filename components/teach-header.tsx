@@ -3,15 +3,16 @@
 import { useState, useRef, useEffect } from "react";
 import { UserCircleIcon } from "@heroicons/react/24/outline";
 import { AccountSettingsModal } from "./account-settings-modal";
+import { usePathname } from "next/navigation"; // Import usePathname
 
-interface TeachHeaderProps {
-  className: string; // Recibe el nombre de la clase actual
-}
-
-export function TeachHeader({ className }: TeachHeaderProps) {
+export function TeachHeader() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname(); // Get the pathname
+
+  // Extract the classId from the pathname, assuming it's in the format /teach/clases/[classId]
+  const classId = pathname?.split("/").pop() || null;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -47,9 +48,12 @@ export function TeachHeader({ className }: TeachHeaderProps) {
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">
-              Clase: {className}
-            </h1>
+            {/* Show class name only if we are not in the "/teach" path */}
+            {pathname !== "/teach" && classId && (
+              <h1 className="text-xl font-semibold text-gray-900">
+                Clase: {classId}
+              </h1>
+            )}
           </div>
 
           <div className="relative" ref={dropdownRef}>
