@@ -1,19 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation"; // Import useParams
-
-interface ClassDetailPageProps {
-  params: {
-    classId: string; // We no longer directly access params.classId, instead we use useParams
-  };
-}
+import { useParams } from "next/navigation";
+import Image from "next/image";
 
 export default function ClassDetailPage() {
-  const params = useParams(); // Unwrap the classId parameter using useParams
-  const classId = params?.classId as string | undefined; // Type assertion to safely extract classId
-  const [classDetail, setClassDetail] = useState<any>(null); // Almacena los detalles de la clase
-  const [students, setStudents] = useState<any[]>([]); // Almacena los estudiantes
+  const params = useParams();
+  const classId = params?.classId as string | undefined;
+
+  const [classDetail, setClassDetail] = useState<any>(null);
+  const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
 
@@ -29,69 +25,43 @@ export default function ClassDetailPage() {
         const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
         if (!token) throw new Error("No token found!");
 
-        // Obtener las clases del profesor para hacer el match con el classroom_id
+        // 1) Obtener lista de clases del profe
         const resClasses = await fetch(
           `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/teacher`,
           {
             method: "GET",
-            headers: {
-              Authorization: token,
-            },
+            headers: { Authorization: token },
           }
         );
         const dataClasses = await resClasses.json();
         if (!resClasses.ok)
           throw new Error(dataClasses.error || "Error fetching classes");
 
-        // Buscar el classroom_id que coincida con la clase clickeada
+        // 2) Encontrar la clase actual por slug
         const classFound = dataClasses.find(
-          (classItem: any) =>
-            classItem.name
+          (ci: any) =>
+            ci.name
               .toLowerCase()
-              .replace(/á/g, "a")
-              .replace(/é/g, "e")
-              .replace(/í/g, "i")
-              .replace(/ó/g, "o")
-              .replace(/ú/g, "u")
-              .replace(/ñ/g, "n")
-              .replace(/\s+/g, "-") === classId // Use classId from params
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .replace(/\s+/g, "-") === classId
         );
+        if (!classFound) throw new Error("Clase no encontrada.");
 
-        if (!classFound) {
-          throw new Error("Clase no encontrada.");
-        }
-
-        // Obtener detalles de la clase usando classroom_id
-        const resClass = await fetch(
+        // 3) Obtener detalles de la clase (incluye students array)
+        const resDetail = await fetch(
           `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/${classFound.classroom_id}/students`,
           {
             method: "GET",
-            headers: {
-              Authorization: token,
-            },
+            headers: { Authorization: token },
           }
         );
+        const dataDetail = await resDetail.json();
+        if (!resDetail.ok)
+          throw new Error(dataDetail.error || "Error fetching class details");
 
-        const dataClass = await resClass.json();
-        if (!resClass.ok)
-          throw new Error(dataClass.error || "Error fetching class");
-
-        // Obtener los estudiantes
-        const resStudents = await fetch(
-          `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/${classFound.classroom_id}/students`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: token,
-            },
-          }
-        );
-        const dataStudents = await resStudents.json();
-        if (!resStudents.ok)
-          throw new Error(dataStudents.error || "Error fetching students");
-
-        setClassDetail(dataClass); // Guarda los detalles de la clase
-        setStudents(dataStudents.students); // Guarda la lista de estudiantes
+        setClassDetail(dataDetail); // { classroom_name, students: [...] }
+        setStudents(dataDetail.students); // array de estudiantes
       } catch (err: any) {
         setError(err.message || "Error al cargar los detalles.");
       } finally {
@@ -100,10 +70,9 @@ export default function ClassDetailPage() {
     };
 
     fetchClassDetail();
-  }, [classId]); // Actualiza cuando el 'classId' cambie
+  }, [classId]);
 
   if (loading) return <p>Cargando...</p>;
-
   if (error) return <p className="text-red-600">{error}</p>;
 
   return (
@@ -115,14 +84,37 @@ export default function ClassDetailPage() {
       </div>
 
       {/* Mosaico de estudiantes */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
         {students.map((student: any) => (
-          <div key={student.user_id} className="border rounded-lg p-4 border-gray-300 text-gray-700 hover:bg-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">
-              {student.name} {student.lastName}
-            </h3>
-            <p className="text-sm text-gray-600">{student.email}</p>
-            <p className="text-xs text-gray-500">{student.dni}</p>
+          <div
+            key={student.user_id}
+            className="border rounded-lg p-4 border-gray-300 hover:shadow-lg transition-shadow overflow-hidden"
+          >
+            <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-4">
+              {/* 1. Skin Image */}
+              <div className="flex-shrink-0">
+                <Image
+                  src={`/img/skins/${student.skinSeleccionada}.png`}
+                  alt={`${student.name} skin`}
+                  width={64}
+                  height={64}
+                  className="rounded-full"
+                />
+              </div>
+
+              {/* 2. Student Info */}
+              <div className="flex-1 min-w-0 text-center sm:text-left">
+                <h3 className="text-lg font-semibold text-gray-900 whitespace-nowrap overflow-hidden">
+                  {student.name} {student.lastName}
+                </h3>
+                <p className="text-sm text-gray-600 whitespace-nowrap overflow-hidden">
+                  {student.email}
+                </p>
+                <p className="text-xs text-gray-500 whitespace-nowrap overflow-hidden">
+                  {student.dni}
+                </p>
+              </div>
+            </div>
           </div>
         ))}
       </div>
