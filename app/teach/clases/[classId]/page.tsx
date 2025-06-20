@@ -18,7 +18,7 @@ export default function ClassDetailPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
-  const [classroomId, setClassroomId] = useState<string>("");
+  const [classroomId, setClassroomIdResolved] = useState<string>("");
 
   const [isHwModalOpen, setIsHwModalOpen] = useState(false);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
@@ -61,17 +61,18 @@ export default function ClassDetailPage() {
         if (!resClasses.ok)
           throw new Error(dataClasses.error || "Error fetching classes");
 
-        const found = dataClasses.find((ci: any) =>
-          ci.name
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/\s+/g, "-") === classSlug
+        const found = dataClasses.find(
+          (ci: any) =>
+            ci.name
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .replace(/\s+/g, "-") === classSlug
         );
         if (!found) throw new Error("Clase no encontrada.");
 
         const cid = found.classroom_id;
-        setClassroomId(cid);
+        setClassroomIdResolved(cid);
 
         // 2) Fetch full classDetail (with initial students array)
         const resDetail = await fetch(
@@ -86,6 +87,22 @@ export default function ClassDetailPage() {
 
         setClassDetail(dataDetail);
         setStudents(dataDetail.students);
+
+        // 3) Fetch the assignment for this classroom and store it in localStorage
+        const assignmentUrl = `${process.env.NEXT_PUBLIC_ASSIGNMENTS_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/assignments?classroom_id=${cid}`;
+        const resAssign = await fetch(assignmentUrl, {
+          method: "GET",
+          headers: { Authorization: token },
+        });
+        const dataAssign = await resAssign.json();
+        if (!resAssign.ok)
+          throw new Error(dataAssign.error || "Error fetching assignments");
+
+        // Assuming the response always contains 1 assignment
+        const assignmentId = dataAssign.assignments[0]?.assignment_id;
+        if (assignmentId) {
+          localStorage.setItem("AssignmentID", assignmentId);
+        }
       } catch (err: any) {
         setError(err.message);
       } finally {

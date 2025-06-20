@@ -56,27 +56,25 @@ export function CreateClassModal({
       }
       const classroom_id = dataClass.classroom_id as string;
 
-      // 2) Crear las dos asignaciones por defecto
+      // 2) Crear una asignación por defecto
       const assignmentUrl = `${process.env.NEXT_PUBLIC_ASSIGNMENTS_API_URL}/${stage}/assignments`;
-      const payloads = [
-        { classroom_id, game_name: "GameJump", level_ids: [] },
-        { classroom_id, game_name: "QJ_1-1",   level_ids: [] },
-      ];
-      await Promise.all(
-        payloads.map((body) =>
-          fetch(assignmentUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: token,
-            },
-            body: JSON.stringify(body),
-          }).then(async (res) => {
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Error creando asignación.");
-          })
-        )
-      );
+      const payload = {
+        classroom_id,
+        game_name: classroom_id,
+        level_ids: [],
+      };
+
+      await fetch(assignmentUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token,
+        },
+        body: JSON.stringify(payload),
+      }).then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Error creando asignación.");
+      });
 
       // 3) Notificar al padre y cerrar modal
       onCreateClass(name);

@@ -26,6 +26,7 @@ export function CreateHomeworkModal({
   const [assignmentId, setAssignmentId] = useState<string>("");
   const [homeworkName, setHomeworkName] = useState<string>("");
   const [description, setDescription] = useState<string>("");
+  const [gameType, setGameType] = useState<string>(""); // Added to handle game type
 
   const [questions, setQuestions] = useState<Question[]>(
     Array.from({ length: 8 }, () => ({
@@ -41,9 +42,8 @@ export function CreateHomeworkModal({
 
   useEffect(() => {
     if (isOpen) {
-      const jumpId = localStorage.getItem("GameJumpID") || "";
-      const qj11Id = localStorage.getItem("QJ_1-1ID") || "";
-      setAssignmentId(jumpId || qj11Id);
+      const assignmentId = localStorage.getItem("AssignmentID") || "";
+      setAssignmentId(assignmentId);
       dialogRef.current?.showModal();
     } else {
       dialogRef.current?.close();
@@ -137,10 +137,7 @@ export function CreateHomeworkModal({
         },
         body: JSON.stringify({
           assignment_id: assignmentId,
-          game_type:
-            assignmentId === localStorage.getItem("GameJumpID")
-              ? "GameJump"
-              : "QJ_1-1",
+          game_type: gameType, // Set the correct game_type
           name: homeworkName.trim(),
           description: description.trim(),
           questions_ids: [],
@@ -207,22 +204,14 @@ export function CreateHomeworkModal({
               Asignación
             </label>
             <select
-              value={assignmentId}
-              onChange={(e) => setAssignmentId(e.target.value)}
+              value={gameType}
+              onChange={(e) => setGameType(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-md"
               disabled={loading}
             >
               <option value="">-- Selecciona un juego --</option>
-              {localStorage.getItem("GameJumpID") && (
-                <option value={localStorage.getItem("GameJumpID")!}>
-                  Qubo Jump
-                </option>
-              )}
-              {localStorage.getItem("QJ_1-1ID") && (
-                <option value={localStorage.getItem("QJ_1-1ID")!}>
-                  Qubo Crossy River
-                </option>
-              )}
+              <option value="GameJump">SaltoClave</option>
+              <option value="QJ_1-1">RiosSplash</option>
             </select>
           </div>
 
