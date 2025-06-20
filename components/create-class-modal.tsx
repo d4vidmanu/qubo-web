@@ -26,7 +26,8 @@ export function CreateClassModal({
 
   const handleCreate = async () => {
     setError("");
-    if (!className.trim()) return;
+    const name = className.trim();
+    if (!name) return;
 
     // Obtener token de cookie
     const match = document.cookie.match(/(^|;) *token=([^;]+)/);
@@ -38,25 +39,47 @@ export function CreateClassModal({
 
     setLoading(true);
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/create`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: token,
-          },
-          body: JSON.stringify({ name: className.trim() }),
-        }
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Error creando la clase.");
+      // 1) Crear la clase
+      const stage = process.env.NEXT_PUBLIC_USER_API_STAGE;
+      const classroomUrl = `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${stage}/classrooms/create`;
+      const resClass = await fetch(classroomUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token,
+        },
+        body: JSON.stringify({ name }),
+      });
+      const dataClass = await resClass.json();
+      if (!resClass.ok) {
+        throw new Error(dataClass.error || "Error creando la clase.");
       }
+      const classroom_id = dataClass.classroom_id as string;
 
-      // Llamada a la función que pasa solo el nombre de la clase
-      onCreateClass(data.name);
+      // 2) Crear las dos asignaciones por defecto
+      const assignmentUrl = `${process.env.NEXT_PUBLIC_ASSIGMENTS_API_URL}/${stage}/assignments`;
+      const payloads = [
+        { classroom_id, game_name: "GameJump", level_ids: [] },
+        { classroom_id, game_name: "QJ_1-1",   level_ids: [] },
+      ];
+      await Promise.all(
+        payloads.map((body) =>
+          fetch(assignmentUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: token,
+            },
+            body: JSON.stringify(body),
+          }).then(async (res) => {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Error creando asignación.");
+          })
+        )
+      );
 
+      // 3) Notificar al padre y cerrar modal
+      onCreateClass(name);
       setClassName("");
       onClose();
     } catch (err: any) {
