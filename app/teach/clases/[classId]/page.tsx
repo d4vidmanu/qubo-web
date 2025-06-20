@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
+import { ClipboardDocumentListIcon } from "@heroicons/react/24/outline";
+import { CreateHomeworkModal } from "@/components/CreateHomeworkModal";
 
 export default function ClassDetailPage() {
   const params = useParams();
@@ -12,6 +14,8 @@ export default function ClassDetailPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
+
+  const [isHwModalOpen, setIsHwModalOpen] = useState(false);
 
   useEffect(() => {
     if (!classId) {
@@ -34,12 +38,13 @@ export default function ClassDetailPage() {
         if (!resClasses.ok)
           throw new Error(dataClasses.error || "Error fetching classes");
 
-        const classFound = dataClasses.find((ci: any) =>
-          ci.name
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/\s+/g, "-") === classId
+        const classFound = dataClasses.find(
+          (ci: any) =>
+            ci.name
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .replace(/\s+/g, "-") === classId
         );
         if (!classFound) throw new Error("Clase no encontrada.");
 
@@ -67,7 +72,7 @@ export default function ClassDetailPage() {
         if (!resAssign.ok)
           throw new Error(dataAssign.error || "Error fetching assignments");
 
-        // --- 4) Clean out old IDs and store new ones ---
+        // --- 4) Store assignment IDs ---
         localStorage.removeItem("GameJumpID");
         localStorage.removeItem("QJ_1-1ID");
 
@@ -91,48 +96,65 @@ export default function ClassDetailPage() {
   if (error) return <p className="text-red-600">{error}</p>;
 
   return (
-    <div className="space-y-6 text-gray-900">
-      <div>
-        <p>
-          <strong>Estudiantes:</strong> {classDetail.students.length}
-        </p>
-      </div>
+    <>
+      <CreateHomeworkModal
+        isOpen={isHwModalOpen}
+        onClose={() => setIsHwModalOpen(false)}
+        onSuccess={() => {
+          /* you can re-fetch or show a toast here */
+        }}
+      />
 
-      {/* Mosaico de estudiantes */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-        {students.map((student: any) => (
-          <div
-            key={student.user_id}
-            className="border rounded-lg p-4 border-gray-300 hover:shadow-lg transition-shadow overflow-hidden"
+      <div className="space-y-6 text-gray-900">
+        <div className="flex items-center justify-between">
+          <p>
+            <strong>Estudiantes:</strong> {classDetail.students.length}
+          </p>
+          <button
+            onClick={() => setIsHwModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
           >
-            <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-4">
-              {/* Skin Image */}
-              <div className="flex-shrink-0">
-                <Image
-                  src={`/img/skins/${student.skinSeleccionada}.png`}
-                  alt={`${student.name} skin`}
-                  width={64}
-                  height={64}
-                  className="rounded-full"
-                />
-              </div>
+            <ClipboardDocumentListIcon className="w-5 h-5" />
+            Nueva tarea
+          </button>
+        </div>
 
-              {/* Student Info */}
-              <div className="flex-1 min-w-0 text-center sm:text-left">
-                <h3 className="text-lg font-semibold text-gray-900 whitespace-nowrap overflow-hidden">
-                  {student.name} {student.lastName}
-                </h3>
-                <p className="text-sm text-gray-600 whitespace-nowrap overflow-hidden">
-                  {student.email}
-                </p>
-                <p className="text-xs text-gray-500 whitespace-nowrap overflow-hidden">
-                  {student.dni}
-                </p>
+        {/* Mosaico de estudiantes */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+          {students.map((student: any) => (
+            <div
+              key={student.user_id}
+              className="border rounded-lg p-4 border-gray-300 hover:shadow-lg transition-shadow overflow-hidden"
+            >
+              <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-4">
+                {/* Skin Image */}
+                <div className="flex-shrink-0">
+                  <Image
+                    src={`/img/skins/${student.skinSeleccionada}.png`}
+                    alt={`${student.name} skin`}
+                    width={64}
+                    height={64}
+                    className="rounded-full"
+                  />
+                </div>
+
+                {/* Student Info */}
+                <div className="flex-1 min-w-0 text-center sm:text-left">
+                  <h3 className="text-lg font-semibold text-gray-900 whitespace-nowrap overflow-hidden">
+                    {student.name} {student.lastName}
+                  </h3>
+                  <p className="text-sm text-gray-600 whitespace-nowrap overflow-hidden">
+                    {student.email}
+                  </p>
+                  <p className="text-xs text-gray-500 whitespace-nowrap overflow-hidden">
+                    {student.dni}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
