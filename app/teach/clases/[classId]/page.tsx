@@ -20,48 +20,63 @@ export default function ClassDetailPage() {
       return;
     }
 
-    const fetchClassDetail = async () => {
+    const fetchClassAndAssignments = async () => {
       try {
         const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
         if (!token) throw new Error("No token found!");
 
-        // 1) Obtener lista de clases del profe
+        // --- 1) Resolve slug → classroom_id ---
         const resClasses = await fetch(
           `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/teacher`,
-          {
-            method: "GET",
-            headers: { Authorization: token },
-          }
+          { method: "GET", headers: { Authorization: token } }
         );
         const dataClasses = await resClasses.json();
         if (!resClasses.ok)
           throw new Error(dataClasses.error || "Error fetching classes");
 
-        // 2) Encontrar la clase actual por slug
-        const classFound = dataClasses.find(
-          (ci: any) =>
-            ci.name
-              .toLowerCase()
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "")
-              .replace(/\s+/g, "-") === classId
+        const classFound = dataClasses.find((ci: any) =>
+          ci.name
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\s+/g, "-") === classId
         );
         if (!classFound) throw new Error("Clase no encontrada.");
 
-        // 3) Obtener detalles de la clase (incluye students array)
+        const classroom_id = classFound.classroom_id;
+
+        // --- 2) Fetch students for this classroom ---
         const resDetail = await fetch(
-          `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/${classFound.classroom_id}/students`,
-          {
-            method: "GET",
-            headers: { Authorization: token },
-          }
+          `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/${classroom_id}/students`,
+          { method: "GET", headers: { Authorization: token } }
         );
         const dataDetail = await resDetail.json();
         if (!resDetail.ok)
           throw new Error(dataDetail.error || "Error fetching class details");
 
-        setClassDetail(dataDetail); // { classroom_name, students: [...] }
-        setStudents(dataDetail.students); // array de estudiantes
+        setClassDetail(dataDetail);
+        setStudents(dataDetail.students);
+
+        // --- 3) Fetch assignments for this classroom ---
+        const assignmentUrl = `${process.env.NEXT_PUBLIC_ASSIGNMENTS_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/assignments?classroom_id=${classroom_id}`;
+        const resAssign = await fetch(assignmentUrl, {
+          method: "GET",
+          headers: { Authorization: token },
+        });
+        const dataAssign = await resAssign.json();
+        if (!resAssign.ok)
+          throw new Error(dataAssign.error || "Error fetching assignments");
+
+        // --- 4) Clean out old IDs and store new ones ---
+        localStorage.removeItem("GameJumpID");
+        localStorage.removeItem("QJ_1-1ID");
+
+        const assignments: any[] = dataAssign.assignments || [];
+        const jump = assignments.find((a) => a.game_name === "GameJump");
+        const qj11 = assignments.find((a) => a.game_name === "QJ_1-1");
+
+        if (jump) localStorage.setItem("GameJumpID", jump.assignment_id);
+        if (qj11) localStorage.setItem("QJ_1-1ID", qj11.assignment_id);
       } catch (err: any) {
         setError(err.message || "Error al cargar los detalles.");
       } finally {
@@ -69,7 +84,7 @@ export default function ClassDetailPage() {
       }
     };
 
-    fetchClassDetail();
+    fetchClassAndAssignments();
   }, [classId]);
 
   if (loading) return <p>Cargando...</p>;
@@ -91,7 +106,7 @@ export default function ClassDetailPage() {
             className="border rounded-lg p-4 border-gray-300 hover:shadow-lg transition-shadow overflow-hidden"
           >
             <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-4">
-              {/* 1. Skin Image */}
+              {/* Skin Image */}
               <div className="flex-shrink-0">
                 <Image
                   src={`/img/skins/${student.skinSeleccionada}.png`}
@@ -102,7 +117,7 @@ export default function ClassDetailPage() {
                 />
               </div>
 
-              {/* 2. Student Info */}
+              {/* Student Info */}
               <div className="flex-1 min-w-0 text-center sm:text-left">
                 <h3 className="text-lg font-semibold text-gray-900 whitespace-nowrap overflow-hidden">
                   {student.name} {student.lastName}

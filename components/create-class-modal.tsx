@@ -57,7 +57,7 @@ export function CreateClassModal({
       const classroom_id = dataClass.classroom_id as string;
 
       // 2) Crear las dos asignaciones por defecto
-      const assignmentUrl = `${process.env.NEXT_PUBLIC_ASSIGMENTS_API_URL}/${stage}/assignments`;
+      const assignmentUrl = `${process.env.NEXT_PUBLIC_ASSIGNMENTS_API_URL}/${stage}/assignments`;
       const payloads = [
         { classroom_id, game_name: "GameJump", level_ids: [] },
         { classroom_id, game_name: "QJ_1-1",   level_ids: [] },
