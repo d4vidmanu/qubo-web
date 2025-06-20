@@ -3,33 +3,56 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
-import { ClipboardDocumentListIcon } from "@heroicons/react/24/outline";
+import {
+  ClipboardDocumentListIcon,
+  UserPlusIcon,
+} from "@heroicons/react/24/outline";
 import { CreateHomeworkModal } from "@/components/CreateHomeworkModal";
+import { CreateStudentModal } from "@/components/CreateStudentModal";
 
 export default function ClassDetailPage() {
   const params = useParams();
-  const classId = params?.classId as string | undefined;
+  const classSlug = params?.classId as string | undefined;
 
   const [classDetail, setClassDetail] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [classroomId, setClassroomId] = useState<string>("");
 
   const [isHwModalOpen, setIsHwModalOpen] = useState(false);
+  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
+
+  // Reusable student fetcher
+  const fetchStudents = async (cid: string) => {
+    const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
+    if (!token) throw new Error("No token found!");
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/${cid}/students`,
+      { method: "GET", headers: { Authorization: token } }
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error fetching students");
+    setStudents(data.students);
+    // keep classDetail.students in sync
+    setClassDetail((prev: any) =>
+      prev ? { ...prev, students: data.students } : prev
+    );
+  };
 
   useEffect(() => {
-    if (!classId) {
+    if (!classSlug) {
       setError("Clase no encontrada.");
       setLoading(false);
       return;
     }
 
-    const fetchClassAndAssignments = async () => {
+    const init = async () => {
       try {
         const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
         if (!token) throw new Error("No token found!");
 
-        // --- 1) Resolve slug → classroom_id ---
+        // 1) Resolve slug → classroom_id
         const resClasses = await fetch(
           `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/teacher`,
           { method: "GET", headers: { Authorization: token } }
@@ -38,59 +61,40 @@ export default function ClassDetailPage() {
         if (!resClasses.ok)
           throw new Error(dataClasses.error || "Error fetching classes");
 
-        const classFound = dataClasses.find(
-          (ci: any) =>
-            ci.name
-              .toLowerCase()
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "")
-              .replace(/\s+/g, "-") === classId
+        const found = dataClasses.find((ci: any) =>
+          ci.name
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\s+/g, "-") === classSlug
         );
-        if (!classFound) throw new Error("Clase no encontrada.");
+        if (!found) throw new Error("Clase no encontrada.");
 
-        const classroom_id = classFound.classroom_id;
+        const cid = found.classroom_id;
+        setClassroomId(cid);
 
-        // --- 2) Fetch students for this classroom ---
+        // 2) Fetch full classDetail (with initial students array)
         const resDetail = await fetch(
-          `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/${classroom_id}/students`,
+          `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/${cid}/students`,
           { method: "GET", headers: { Authorization: token } }
         );
         const dataDetail = await resDetail.json();
         if (!resDetail.ok)
-          throw new Error(dataDetail.error || "Error fetching class details");
+          throw new Error(
+            dataDetail.error || "Error fetching classroom students"
+          );
 
         setClassDetail(dataDetail);
         setStudents(dataDetail.students);
-
-        // --- 3) Fetch assignments for this classroom ---
-        const assignmentUrl = `${process.env.NEXT_PUBLIC_ASSIGNMENTS_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/assignments?classroom_id=${classroom_id}`;
-        const resAssign = await fetch(assignmentUrl, {
-          method: "GET",
-          headers: { Authorization: token },
-        });
-        const dataAssign = await resAssign.json();
-        if (!resAssign.ok)
-          throw new Error(dataAssign.error || "Error fetching assignments");
-
-        // --- 4) Store assignment IDs ---
-        localStorage.removeItem("GameJumpID");
-        localStorage.removeItem("QJ_1-1ID");
-
-        const assignments: any[] = dataAssign.assignments || [];
-        const jump = assignments.find((a) => a.game_name === "GameJump");
-        const qj11 = assignments.find((a) => a.game_name === "QJ_1-1");
-
-        if (jump) localStorage.setItem("GameJumpID", jump.assignment_id);
-        if (qj11) localStorage.setItem("QJ_1-1ID", qj11.assignment_id);
       } catch (err: any) {
-        setError(err.message || "Error al cargar los detalles.");
+        setError(err.message);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchClassAndAssignments();
-  }, [classId]);
+    init();
+  }, [classSlug]);
 
   if (loading) return <p>Cargando...</p>;
   if (error) return <p className="text-red-600">{error}</p>;
@@ -101,22 +105,41 @@ export default function ClassDetailPage() {
         isOpen={isHwModalOpen}
         onClose={() => setIsHwModalOpen(false)}
         onSuccess={() => {
-          /* you can re-fetch or show a toast here */
+          /* e.g. refetch assignments */
+        }}
+      />
+
+      <CreateStudentModal
+        isOpen={isStudentModalOpen}
+        onClose={() => setIsStudentModalOpen(false)}
+        classroomId={classroomId}
+        onSuccess={() => {
+          // reload only the students list
+          fetchStudents(classroomId);
         }}
       />
 
       <div className="space-y-6 text-gray-900">
         <div className="flex items-center justify-between">
           <p>
-            <strong>Estudiantes:</strong> {classDetail.students.length}
+            <strong>Estudiantes:</strong> {students.length}
           </p>
-          <button
-            onClick={() => setIsHwModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
-          >
-            <ClipboardDocumentListIcon className="w-5 h-5" />
-            Nueva tarea
-          </button>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setIsStudentModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+            >
+              <UserPlusIcon className="w-5 h-5" />
+              Añadir Alumno
+            </button>
+            <button
+              onClick={() => setIsHwModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+            >
+              <ClipboardDocumentListIcon className="w-5 h-5" />
+              Nueva tarea
+            </button>
+          </div>
         </div>
 
         {/* Mosaico de estudiantes */}
@@ -127,18 +150,16 @@ export default function ClassDetailPage() {
               className="border rounded-lg p-4 border-gray-300 hover:shadow-lg transition-shadow overflow-hidden"
             >
               <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-4">
-                {/* Skin Image */}
                 <div className="flex-shrink-0">
                   <Image
                     src={`/img/skins/${student.skinSeleccionada}.png`}
                     alt={`${student.name} skin`}
                     width={64}
                     height={64}
+                    priority
                     className="rounded-full"
                   />
                 </div>
-
-                {/* Student Info */}
                 <div className="flex-1 min-w-0 text-center sm:text-left">
                   <h3 className="text-lg font-semibold text-gray-900 whitespace-nowrap overflow-hidden">
                     {student.name} {student.lastName}
