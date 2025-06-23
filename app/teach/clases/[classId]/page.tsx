@@ -11,48 +11,45 @@ import {
 import { CreateHomeworkModal } from "@/components/CreateHomeworkModal";
 import { CreateStudentModal } from "@/components/CreateStudentModal";
 import { AssignmentsModal } from "@/components/AssignmentsModal";
+import { StudentStatsModal } from "@/components/StudentStatsModal";
 
 export default function ClassDetailPage() {
   const params = useParams();
-  const classSlug = params?.classId as string | undefined;
+  const classSlug = params?.classId;
 
-  const [classDetail, setClassDetail] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>("");
-  const [classroomId, setClassroomId] = useState<string>("");
+  const [error, setError] = useState("");
+  const [classroomId, setClassroomId] = useState("");
 
   const [isHwModalOpen, setIsHwModalOpen] = useState(false);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [statsUser, setStatsUser] = useState<{ id: string; name: string }>({ id: "", name: "" });
 
-  // reload students helper
   const fetchStudents = async (cid: string) => {
     const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/${cid}/students`,
-      { method: "GET", headers: { Authorization: token! } }
+      { headers: { Authorization: token! } }
     );
     const data = await res.json();
     setStudents(data.students || []);
   };
 
   useEffect(() => {
-    if (!classSlug) {
-      setError("Clase no encontrada.");
-      setLoading(false);
-      return;
-    }
-    const init = async () => {
+    if (!classSlug) return setError("Clase no encontrada."), setLoading(false);
+    (async () => {
       try {
         const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
-        // 1) resolve slug → classroom_id
-        const resClasses = await fetch(
+        // resolve slug → classroom_id
+        const rc = await fetch(
           `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/teacher`,
-          { method: "GET", headers: { Authorization: token! } }
+          { headers: { Authorization: token! } }
         );
-        const dataClasses = await resClasses.json();
-        const found = dataClasses.find((ci: any) =>
+        const dc = await rc.json();
+        const found = dc.find((ci: any) =>
           ci.name
             .toLowerCase()
             .normalize("NFD")
@@ -61,22 +58,13 @@ export default function ClassDetailPage() {
         );
         const cid = found.classroom_id;
         setClassroomId(cid);
-
-        // 2) fetch students
-        const resDetail = await fetch(
-          `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/${cid}/students`,
-          { method: "GET", headers: { Authorization: token! } }
-        );
-        const dataDetail = await resDetail.json();
-        setClassDetail(dataDetail);
-        setStudents(dataDetail.students || []);
-      } catch (err: any) {
-        setError(err.message);
+        await fetchStudents(cid);
+      } catch (e: any) {
+        setError(e.message);
       } finally {
         setLoading(false);
       }
-    };
-    init();
+    })();
   }, [classSlug]);
 
   if (loading) return <p>Cargando...</p>;
@@ -87,21 +75,23 @@ export default function ClassDetailPage() {
       <CreateHomeworkModal
         isOpen={isHwModalOpen}
         onClose={() => setIsHwModalOpen(false)}
-        onSuccess={() => {
-          /* e.g. refetch assignments */
-        }}
       />
-
       <CreateStudentModal
         isOpen={isStudentModalOpen}
         onClose={() => setIsStudentModalOpen(false)}
         classroomId={classroomId}
         onSuccess={() => fetchStudents(classroomId)}
       />
-
       <AssignmentsModal
         isOpen={isAssignModalOpen}
         onClose={() => setIsAssignModalOpen(false)}
+      />
+      <StudentStatsModal
+        isOpen={isStatsOpen}
+        onClose={() => setIsStatsOpen(false)}
+        classroomId={classroomId}
+        userId={statsUser.id}
+        studentName={statsUser.name}
       />
 
       <div className="space-y-6 text-gray-900">
@@ -112,21 +102,21 @@ export default function ClassDetailPage() {
           <div className="flex space-x-2">
             <button
               onClick={() => setIsStudentModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+              className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-gray-100"
             >
               <UserPlusIcon className="w-5 h-5" />
               Añadir Alumno
             </button>
             <button
               onClick={() => setIsHwModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+              className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-gray-100"
             >
               <ClipboardDocumentListIcon className="w-5 h-5" />
               Nueva tarea
             </button>
             <button
               onClick={() => setIsAssignModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+              className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-gray-100"
             >
               <DocumentTextIcon className="w-5 h-5" />
               Ver tareas
@@ -135,30 +125,29 @@ export default function ClassDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-          {students.map((student: any) => (
+          {students.map((s) => (
             <div
-              key={student.user_id}
-              className="border rounded-lg p-4 border-gray-300 hover:shadow-lg transition-shadow overflow-hidden"
+              key={s.user_id}
+              onClick={() => {
+                setStatsUser({ id: s.user_id, name: s.name });
+                setIsStatsOpen(true);
+              }}
+              className="border rounded-lg p-4 cursor-pointer hover:shadow-lg transition-shadow overflow-hidden"
             >
-              <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-4">
+              <div className="flex items-center space-x-4">
                 <Image
-                  src={`/img/skins/${student.skinSeleccionada}.png`}
-                  alt={`${student.name} skin`}
+                  src={`/img/skins/${s.skinSeleccionada}.png`}
+                  alt=""
                   width={64}
                   height={64}
                   priority
-                  className="rounded-full flex-shrink-0"
+                  className="rounded-full"
                 />
-                <div className="flex-1 min-w-0 text-center sm:text-left">
-                  <h3 className="text-lg font-semibold text-gray-900 whitespace-nowrap overflow-hidden">
-                    {student.name} {student.lastName}
-                  </h3>
-                  <p className="text-sm text-gray-600 whitespace-nowrap overflow-hidden">
-                    {student.email}
+                <div className="min-w-0">
+                  <p className="font-semibold truncate">
+                    {s.name} {s.lastName}
                   </p>
-                  <p className="text-xs text-gray-500 whitespace-nowrap overflow-hidden">
-                    {student.dni}
-                  </p>
+                  <p className="text-xs truncate">{s.email}</p>
                 </div>
               </div>
             </div>
