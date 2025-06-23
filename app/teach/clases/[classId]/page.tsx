@@ -15,6 +15,42 @@ import { AssignmentsModal } from "@/components/AssignmentsModal";
 import { ClassroomStatsModal } from "@/components/ClassroomStatsModal";
 import { StudentStatsModal } from "@/components/StudentStatsModal";
 
+// Helper to read and write cookies
+const getCookie = (name: string): string | null => {
+  const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+  return match ? decodeURIComponent(match[2]) : null;
+};
+
+const setCookie = (name: string, value: string) => {
+  document.cookie = `${name}=${value}; path=/;`;
+};
+
+// Function to fetch and set Assignment ID in cookies
+const fetchAssignmentId = async (classroomId: string) => {
+  const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
+  if (!token) throw new Error("No token found");
+
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_ASSIGNMENTS_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/assignments?classroom_id=${classroomId}`,
+    {
+      method: "GET",
+      headers: { Authorization: token },
+    }
+  );
+
+  if (!res.ok) throw new Error("Failed to fetch assignments");
+
+  const data = await res.json();
+  if (data.assignments && data.assignments.length > 0) {
+    // Assuming that the first assignment is the one we need
+    const assignmentId = data.assignments[0].assignment_id;
+    setCookie("AssignmentID", assignmentId); // Save to cookies
+    return assignmentId;
+  }
+
+  throw new Error("No assignments found");
+};
+
 export default function ClassDetailPage() {
   const params = useParams();
   const classSlug = params?.classId;
@@ -23,6 +59,7 @@ export default function ClassDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [classroomId, setClassroomId] = useState("");
+  const [assignmentId, setAssignmentId] = useState<string>("");
 
   const [isHwModalOpen, setIsHwModalOpen] = useState(false);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
@@ -68,6 +105,9 @@ export default function ClassDetailPage() {
         );
         const cid = found.classroom_id;
         setClassroomId(cid);
+        // Fetch the Assignment ID and set it in cookies
+        const assignmentId = await fetchAssignmentId(cid);
+        setAssignmentId(assignmentId); // Set the fetched Assignment ID
         await fetchStudents(cid);
       } catch (e: any) {
         setError(e.message);
