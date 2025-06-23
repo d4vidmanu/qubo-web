@@ -1,3 +1,4 @@
+// components/QuestionsModal.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -22,6 +23,16 @@ interface QuestionsModalProps {
   levelId: string;
 }
 
+// simple formatter for preview: × for *, ÷ for /
+function formatMath(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\*/g, "×")
+    .replace(/\//g, "÷");
+}
+
 export function QuestionsModal({
   isOpen,
   onClose,
@@ -32,8 +43,8 @@ export function QuestionsModal({
   const [error, setError] = useState<string>("");
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [viewAll, setViewAll] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -99,10 +110,14 @@ export function QuestionsModal({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">Revisar Preguntas</h2>
         <button
-          onClick={() => setViewAll((v) => !v)}
+          onClick={() => {
+            setViewAll((v) => !v);
+            setShowAll(false);
+            setRevealed(new Set());
+          }}
           className="px-4 py-2 border rounded-md hover:bg-gray-100 text-sm"
         >
-          {viewAll ? "Ver preguntas uno a uno" : "Ver todas las preguntas"}
+          {viewAll ? "Ver preguntas una a una" : "Ver todas las preguntas"}
         </button>
       </div>
 
@@ -113,31 +128,35 @@ export function QuestionsModal({
         <>
           {viewAll ? (
             <>
-              {/* Only in list view: show/hide all answers */}
               <div className="flex justify-end mb-2">
                 <button
                   onClick={handleShowAll}
                   className="px-3 py-1 border rounded-md text-sm hover:bg-gray-100"
                 >
                   {showAll
-                    ? "Ocultar todas las respuestas"
-                    : "Mostrar todas las respuestas"}
+                    ? "Ocultar todas respuestas"
+                    : "Mostrar todas respuestas"}
                 </button>
               </div>
-
               <div className="space-y-6">
                 {questions.map((q, idx) => {
                   const isRevealed = showAll || revealed.has(q.question_id);
                   return (
-                    <div key={q.question_id} className="border p-4 rounded-md">
-                      <p className="font-medium mb-2">
-                        Pregunta {idx + 1}: {q.text}
-                      </p>
+                    <div
+                      key={q.question_id}
+                      className="border p-4 rounded-md"
+                      onClick={() => toggleReveal(q.question_id)}
+                    >
+                      <p
+                        className="font-medium mb-2"
+                        dangerouslySetInnerHTML={{
+                          __html: `Pregunta ${idx + 1}: ${formatMath(q.text)}`,
+                        }}
+                      />
                       <ul
                         className={`list-disc list-inside space-y-1 cursor-pointer ${
                           isRevealed ? "" : "filter blur-sm"
                         }`}
-                        onClick={() => toggleReveal(q.question_id)}
                       >
                         {q.options.map((opt, i) => (
                           <li
@@ -147,9 +166,12 @@ export function QuestionsModal({
                                 ? "font-semibold text-green-600"
                                 : ""
                             }
-                          >
-                            {opt} {i === q.correctIndex && "(Correcta)"}
-                          </li>
+                            dangerouslySetInnerHTML={{
+                              __html:
+                                formatMath(opt) +
+                                (i === q.correctIndex ? " (Correcta)" : ""),
+                            }}
+                          />
                         ))}
                       </ul>
                     </div>
@@ -161,9 +183,14 @@ export function QuestionsModal({
             <div className="border p-6 rounded-md">
               {questions.length > 0 && (
                 <>
-                  <p className="font-medium mb-2">
-                    Pregunta {currentIndex + 1}: {questions[currentIndex].text}
-                  </p>
+                  <p
+                    className="font-medium mb-2"
+                    dangerouslySetInnerHTML={{
+                      __html: `Pregunta ${currentIndex + 1}: ${formatMath(
+                        questions[currentIndex].text
+                      )}`,
+                    }}
+                  />
                   <ul
                     className={`list-disc list-inside space-y-1 cursor-pointer ${
                       showAll ||
@@ -183,11 +210,14 @@ export function QuestionsModal({
                             ? "font-semibold text-green-600"
                             : ""
                         }
-                      >
-                        {opt}{" "}
-                        {i === questions[currentIndex].correctIndex &&
-                          "(Correcta)"}
-                      </li>
+                        dangerouslySetInnerHTML={{
+                          __html:
+                            formatMath(opt) +
+                            (i === questions[currentIndex].correctIndex
+                              ? " (Correcta)"
+                              : ""),
+                        }}
+                      />
                     ))}
                   </ul>
                   <div className="flex justify-between mt-4">
