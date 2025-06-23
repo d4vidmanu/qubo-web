@@ -1,20 +1,7 @@
-// components/CreateHomeworkModal.tsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-
-interface CreateHomeworkModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess?: () => void;
-}
-
-interface Question {
-  text: string;
-  options: [string, string, string];
-  topic: string;
-}
 
 // only allow letters, digits, + - * / ^ = . whitespace and grouping symbols
 function sanitizeInput(input: string): string {
@@ -30,6 +17,12 @@ function formatMath(input: string): string {
     .replace(/\*/g, "×")
     .replace(/\//g, "÷");
 }
+
+// Helper to read a named cookie
+const getCookie = (name: string): string | null => {
+  const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+  return match ? decodeURIComponent(match[2]) : null;
+};
 
 function MathKeyboard({
   onKey,
@@ -93,14 +86,24 @@ export function CreateHomeworkModal({
   isOpen,
   onClose,
   onSuccess,
-}: CreateHomeworkModalProps) {
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+}) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const [step, setStep] = useState<1 | 2>(1);
   const [assignmentId, setAssignmentId] = useState("");
-  const [gameType, setGameType] = useState("");
+  const [gameType, setGameType] = useState(""); // Ensure gameType is set correctly
   const [homeworkName, setHomeworkName] = useState("");
   const [description, setDescription] = useState("");
+  type Question = {
+    text: string;
+    options: [string, string, string];
+    topic: string;
+  };
+
   const [questions, setQuestions] = useState<Question[]>(
     Array.from({ length: 8 }, () => ({
       text: "",
@@ -118,13 +121,13 @@ export function CreateHomeworkModal({
 
   useEffect(() => {
     if (isOpen) {
-      setAssignmentId(localStorage.getItem("AssignmentID") || "");
+      setAssignmentId(getCookie("AssignmentID") || "");
       dialogRef.current?.showModal();
     } else {
       dialogRef.current?.close();
       // reset all
       setStep(1);
-      setGameType("");
+      setGameType(""); // Reset gameType
       setHomeworkName("");
       setDescription("");
       setQuestions(
@@ -157,6 +160,9 @@ export function CreateHomeworkModal({
   };
 
   const handleNext = () => {
+    console.log("Assignment ID:", assignmentId); // Debugging the value of assignmentId
+    console.log("Game Type:", gameType); // Debugging the value of gameType
+
     if (!assignmentId || !gameType) {
       setError("Debes seleccionar un juego.");
       return;
@@ -189,7 +195,7 @@ export function CreateHomeworkModal({
         setError(`Pregunta ${i + 1} vacía.`);
         return;
       }
-      if (q.options.some((o) => !o.trim())) {
+      if (q.options.some((o: string) => !o.trim())) {
         setError(`Opciones faltantes en P${i + 1}.`);
         return;
       }
@@ -225,7 +231,7 @@ export function CreateHomeworkModal({
       const payload = questions.map((q) => ({
         level_id: lvlData.level_id,
         text: q.text.trim(),
-        options: q.options.map((o) => o.trim()),
+        options: q.options.map((o: string) => o.trim()),
         correctIndex: 0,
         topic: q.topic.trim(),
       }));
@@ -357,29 +363,38 @@ export function CreateHomeworkModal({
 
               {/* Opciones */}
               <div className="grid grid-cols-3 gap-2">
-                {q.options.map((opt, i) => (
-                  <div key={i}>
-                    <label className="text-xs text-gray-600 mb-1 block">
-                      Opción {i + 1}
-                      {i === 0 && " (Correcta)"}
-                    </label>
-                    <input
-                      type="text"
-                      value={opt}
-                      onChange={(e) => {
-                        const o = [...q.options] as [string, string, string];
-                        o[i] = sanitizeInput(e.target.value);
-                        updateQuestion(idx, "options", o);
-                      }}
-                      className="w-full px-2 py-1 border rounded-md"
-                      disabled={loading}
-                    />
-                    <div
-                      className="mt-1 text-gray-600"
-                      dangerouslySetInnerHTML={{ __html: formatMath(opt) }}
-                    />
-                  </div>
-                ))}
+                {q.options.map(
+                  (
+                    opt: string | number | readonly string[] | undefined,
+                    i: number
+                  ) => (
+                    <div key={i}>
+                      <label className="text-xs text-gray-600 mb-1 block">
+                        Opción {i + 1}
+                        {i === 0 && " (Correcta)"}
+                      </label>
+                      <input
+                        type="text"
+                        value={opt}
+                        onChange={(e) => {
+                          const o = [...q.options] as [string, string, string];
+                          o[i] = sanitizeInput(e.target.value);
+                          updateQuestion(idx, "options", o);
+                        }}
+                        className="w-full px-2 py-1 border rounded-md"
+                        disabled={loading}
+                      />
+                      <div
+                        className="mt-1 text-gray-600"
+                        dangerouslySetInnerHTML={{
+                          __html: formatMath(
+                            opt !== undefined ? String(opt) : ""
+                          ),
+                        }}
+                      />
+                    </div>
+                  )
+                )}
               </div>
 
               {/* Tema */}

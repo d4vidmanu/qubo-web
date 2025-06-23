@@ -24,6 +24,14 @@ export function AssignmentsModal({ isOpen, onClose }: AssignmentsModalProps) {
   const [selectedLevelId, setSelectedLevelId] = useState<string>("");
   const [isQuestionsOpen, setIsQuestionsOpen] = useState<boolean>(false);
 
+  // Helper to read a named cookie
+  const getCookie = (name: string): string | null => {
+    const match = document.cookie.match(
+      new RegExp("(^| )" + name + "=([^;]+)")
+    );
+    return match ? decodeURIComponent(match[2]) : null;
+  };
+
   useEffect(() => {
     if (isOpen) {
       dialogRef.current?.showModal();
@@ -39,11 +47,11 @@ export function AssignmentsModal({ isOpen, onClose }: AssignmentsModalProps) {
     setLoading(true);
     setError("");
     try {
-      const assignmentId = localStorage.getItem("AssignmentID");
-      if (!assignmentId) throw new Error("No AssignmentID in localStorage");
+      const assignmentId = getCookie("AssignmentID");
+      if (!assignmentId) throw new Error("No AssignmentID cookie present");
 
-      const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
-      if (!token) throw new Error("No token found!");
+      const token = getCookie("token");
+      if (!token) throw new Error("No auth token cookie found!");
 
       const stage = process.env.NEXT_PUBLIC_USER_API_STAGE;
       const base = process.env.NEXT_PUBLIC_ASSIGNMENTS_API_URL;
@@ -98,7 +106,7 @@ export function AssignmentsModal({ isOpen, onClose }: AssignmentsModalProps) {
                   onClick={() => {
                     setSelectedLevelId(lvl.level_id);
                     setIsQuestionsOpen(true);
-                    onClose(); // ✅ Cierra el modal principal
+                    onClose(); // close the modal
                   }}
                   className="w-full text-left px-4 py-2 border border-gray-200 rounded-md hover:bg-gray-100"
                 >
