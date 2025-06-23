@@ -183,7 +183,7 @@ export function AuthModal({
                 <input
                   type="email"
                   value={email}
-                  readOnly
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2 border rounded-md bg-gray-100"
                 />
                 <input
@@ -258,7 +258,7 @@ export function AuthModal({
                 <input
                   type="email"
                   value={email}
-                  readOnly
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2 border rounded-md bg-gray-100"
                 />
                 <input

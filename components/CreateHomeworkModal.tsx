@@ -15,6 +15,21 @@ interface Question {
   topic: string;
 }
 
+// Allow letters, numbers, + - * / ^, spaces, and brackets () [] {}
+function sanitizeInput(input: string): string {
+  return input.replace(/[^A-Za-z0-9+\-*/^()\[\]{}\s]/g, "");
+}
+
+// Only escape HTML and replace * → ×, / → ÷. Leave ^ untouched.
+function formatMath(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\*/g, "×")
+    .replace(/\//g, "÷");
+}
+
 export function CreateHomeworkModal({
   isOpen,
   onClose,
@@ -24,9 +39,9 @@ export function CreateHomeworkModal({
 
   const [step, setStep] = useState<1 | 2>(1);
   const [assignmentId, setAssignmentId] = useState<string>("");
+  const [gameType, setGameType] = useState<string>("");
   const [homeworkName, setHomeworkName] = useState<string>("");
   const [description, setDescription] = useState<string>("");
-  const [gameType, setGameType] = useState<string>(""); // Added to handle game type
 
   const [questions, setQuestions] = useState<Question[]>(
     Array.from({ length: 8 }, () => ({
@@ -35,20 +50,19 @@ export function CreateHomeworkModal({
       topic: "",
     }))
   );
-
   const [topicsUsed, setTopicsUsed] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
   useEffect(() => {
     if (isOpen) {
-      const assignmentId = localStorage.getItem("AssignmentID") || "";
-      setAssignmentId(assignmentId);
+      setAssignmentId(localStorage.getItem("AssignmentID") || "");
       dialogRef.current?.showModal();
     } else {
       dialogRef.current?.close();
-      // Reset state
+      // reset
       setStep(1);
+      setGameType("");
       setHomeworkName("");
       setDescription("");
       setQuestions(
@@ -64,8 +78,8 @@ export function CreateHomeworkModal({
   }, [isOpen]);
 
   const handleNext = () => {
-    if (!assignmentId) {
-      setError("Debes seleccionar un tipo de ejercicio.");
+    if (!assignmentId || !gameType) {
+      setError("Debes seleccionar un juego.");
       return;
     }
     if (!homeworkName.trim() || !description.trim()) {
@@ -83,26 +97,21 @@ export function CreateHomeworkModal({
   ) => {
     setQuestions((qs) => {
       const next = [...qs];
-      if (field === "options") {
+      if (field === "options")
         next[idx].options = value as [string, string, string];
-      } else if (field === "topic") {
-        next[idx].topic = value as string;
-      } else {
-        next[idx].text = value as string;
-      }
+      else if (field === "topic") next[idx].topic = value as string;
+      else next[idx].text = value as string;
       return next;
     });
   };
 
-  const handleTopicBlur = (topic: string) => {
-    const t = topic.trim();
-    if (t && !topicsUsed.includes(t)) {
-      setTopicsUsed((prev) => [...prev, t]);
-    }
+  const handleTopicBlur = (raw: string) => {
+    const t = raw.trim();
+    if (t && !topicsUsed.includes(t)) setTopicsUsed((prev) => [...prev, t]);
   };
 
   const handleSubmit = async () => {
-    // Validate
+    // basic validation
     for (let i = 0; i < 8; i++) {
       const q = questions[i];
       if (!q.text.trim()) {
@@ -129,45 +138,35 @@ export function CreateHomeworkModal({
       const base = process.env.NEXT_PUBLIC_ASSIGNMENTS_API_URL;
 
       // 1) Create level
-      const levelRes = await fetch(`${base}/${stage}/custom-levels`, {
+      const lvlRes = await fetch(`${base}/${stage}/custom-levels`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token,
-        },
+        headers: { "Content-Type": "application/json", Authorization: token },
         body: JSON.stringify({
           assignment_id: assignmentId,
-          game_type: gameType, // Set the correct game_type
+          game_type: gameType,
           name: homeworkName.trim(),
           description: description.trim(),
           questions_ids: [],
         }),
       });
-      const levelData = await levelRes.json();
-      if (!levelRes.ok)
-        throw new Error(levelData.error || "Error creando nivel.");
-
-      const level_id = levelData.level_id as string;
+      const lvlData = await lvlRes.json();
+      if (!lvlRes.ok) throw new Error(lvlData.error || "Error creando nivel.");
 
       // 2) Create questions
-      const questionsPayload = questions.map((q) => ({
-        level_id,
+      const payload = questions.map((q) => ({
+        level_id: lvlData.level_id,
         text: q.text.trim(),
         options: q.options.map((o) => o.trim()),
         correctIndex: 0,
         topic: q.topic.trim(),
       }));
-      const questionRes = await fetch(`${base}/${stage}/custom-questions`, {
+      const qRes = await fetch(`${base}/${stage}/custom-questions`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token,
-        },
-        body: JSON.stringify(questionsPayload),
+        headers: { "Content-Type": "application/json", Authorization: token },
+        body: JSON.stringify(payload),
       });
-      const questionData = await questionRes.json();
-      if (!questionRes.ok)
-        throw new Error(questionData.error || "Error creando preguntas.");
+      const qData = await qRes.json();
+      if (!qRes.ok) throw new Error(qData.error || "Error creando preguntas.");
 
       onSuccess?.();
       onClose();
@@ -194,10 +193,9 @@ export function CreateHomeworkModal({
       <h2 className="text-xl font-semibold text-gray-800 mb-4">
         {step === 1 ? "Nueva Tarea" : "Añade las Preguntas"}
       </h2>
-
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
-      {step === 1 && (
+      {step === 1 ? (
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -206,7 +204,7 @@ export function CreateHomeworkModal({
             <select
               value={gameType}
               onChange={(e) => setGameType(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md"
+              className="w-full px-4 py-2 border rounded-md"
               disabled={loading}
             >
               <option value="">-- Selecciona un juego --</option>
@@ -214,7 +212,6 @@ export function CreateHomeworkModal({
               <option value="QJ_1-1">Rio Splash</option>
             </select>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Nombre de la tarea
@@ -223,11 +220,10 @@ export function CreateHomeworkModal({
               type="text"
               value={homeworkName}
               onChange={(e) => setHomeworkName(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md"
+              className="w-full px-4 py-2 border rounded-md"
               disabled={loading}
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Descripción
@@ -235,11 +231,10 @@ export function CreateHomeworkModal({
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md"
+              className="w-full px-4 py-2 border rounded-md"
               disabled={loading}
             />
           </div>
-
           <div className="flex justify-end pt-4">
             <button
               onClick={handleNext}
@@ -250,9 +245,7 @@ export function CreateHomeworkModal({
             </button>
           </div>
         </div>
-      )}
-
-      {step === 2 && (
+      ) : (
         <div className="space-y-6 max-h-[70vh] overflow-y-auto">
           <datalist id="topics">
             {topicsUsed.map((t) => (
@@ -274,14 +267,20 @@ export function CreateHomeworkModal({
                 <input
                   type="text"
                   value={q.text}
-                  onChange={(e) => updateQuestion(idx, "text", e.target.value)}
+                  onChange={(e) =>
+                    updateQuestion(idx, "text", sanitizeInput(e.target.value))
+                  }
                   className="w-full px-3 py-2 border rounded-md"
                   disabled={loading}
+                />
+                <div
+                  className="mt-1 text-gray-600"
+                  dangerouslySetInnerHTML={{ __html: formatMath(q.text) }}
                 />
               </div>
 
               <div className="grid grid-cols-3 gap-2">
-                {[0, 1, 2].map((i) => (
+                {q.options.map((opt, i) => (
                   <div key={i}>
                     <label className="block text-xs text-gray-600 mb-1">
                       Opción {i + 1}
@@ -289,14 +288,18 @@ export function CreateHomeworkModal({
                     </label>
                     <input
                       type="text"
-                      value={q.options[i]}
+                      value={opt}
                       onChange={(e) => {
                         const opts = [...q.options] as [string, string, string];
-                        opts[i] = e.target.value;
+                        opts[i] = sanitizeInput(e.target.value);
                         updateQuestion(idx, "options", opts);
                       }}
                       className="w-full px-2 py-1 border rounded-md"
                       disabled={loading}
+                    />
+                    <div
+                      className="mt-1 text-gray-600"
+                      dangerouslySetInnerHTML={{ __html: formatMath(opt) }}
                     />
                   </div>
                 ))}
@@ -321,7 +324,7 @@ export function CreateHomeworkModal({
             <button
               onClick={() => setStep(1)}
               disabled={loading}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+              className="px-4 py-2 border rounded-md hover:bg-gray-100 disabled:opacity-50"
             >
               Atrás
             </button>
