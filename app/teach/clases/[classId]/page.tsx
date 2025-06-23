@@ -6,9 +6,11 @@ import Image from "next/image";
 import {
   ClipboardDocumentListIcon,
   UserPlusIcon,
+  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import { CreateHomeworkModal } from "@/components/CreateHomeworkModal";
 import { CreateStudentModal } from "@/components/CreateStudentModal";
+import { AssignmentsModal } from "@/components/AssignmentsModal";
 
 export default function ClassDetailPage() {
   const params = useParams();
@@ -18,26 +20,21 @@ export default function ClassDetailPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
-  const [classroomId, setClassroomIdResolved] = useState<string>("");
+  const [classroomId, setClassroomId] = useState<string>("");
 
   const [isHwModalOpen, setIsHwModalOpen] = useState(false);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
 
-  // Reusable student fetcher
+  // reload students helper
   const fetchStudents = async (cid: string) => {
     const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
-    if (!token) throw new Error("No token found!");
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/${cid}/students`,
-      { method: "GET", headers: { Authorization: token } }
+      { method: "GET", headers: { Authorization: token! } }
     );
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error fetching students");
-    setStudents(data.students);
-    // keep classDetail.students in sync
-    setClassDetail((prev: any) =>
-      prev ? { ...prev, students: data.students } : prev
-    );
+    setStudents(data.students || []);
   };
 
   useEffect(() => {
@@ -46,70 +43,39 @@ export default function ClassDetailPage() {
       setLoading(false);
       return;
     }
-
     const init = async () => {
       try {
         const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
-        if (!token) throw new Error("No token found!");
-
-        // 1) Resolve slug → classroom_id
+        // 1) resolve slug → classroom_id
         const resClasses = await fetch(
           `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/teacher`,
-          { method: "GET", headers: { Authorization: token } }
+          { method: "GET", headers: { Authorization: token! } }
         );
         const dataClasses = await resClasses.json();
-        if (!resClasses.ok)
-          throw new Error(dataClasses.error || "Error fetching classes");
-
-        const found = dataClasses.find(
-          (ci: any) =>
-            ci.name
-              .toLowerCase()
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "")
-              .replace(/\s+/g, "-") === classSlug
+        const found = dataClasses.find((ci: any) =>
+          ci.name
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\s+/g, "-") === classSlug
         );
-        if (!found) throw new Error("Clase no encontrada.");
-
         const cid = found.classroom_id;
-        setClassroomIdResolved(cid);
+        setClassroomId(cid);
 
-        // 2) Fetch full classDetail (with initial students array)
+        // 2) fetch students
         const resDetail = await fetch(
           `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/${cid}/students`,
-          { method: "GET", headers: { Authorization: token } }
+          { method: "GET", headers: { Authorization: token! } }
         );
         const dataDetail = await resDetail.json();
-        if (!resDetail.ok)
-          throw new Error(
-            dataDetail.error || "Error fetching classroom students"
-          );
-
         setClassDetail(dataDetail);
-        setStudents(dataDetail.students);
-
-        // 3) Fetch the assignment for this classroom and store it in localStorage
-        const assignmentUrl = `${process.env.NEXT_PUBLIC_ASSIGNMENTS_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/assignments?classroom_id=${cid}`;
-        const resAssign = await fetch(assignmentUrl, {
-          method: "GET",
-          headers: { Authorization: token },
-        });
-        const dataAssign = await resAssign.json();
-        if (!resAssign.ok)
-          throw new Error(dataAssign.error || "Error fetching assignments");
-
-        // Assuming the response always contains 1 assignment
-        const assignmentId = dataAssign.assignments[0]?.assignment_id;
-        if (assignmentId) {
-          localStorage.setItem("AssignmentID", assignmentId);
-        }
+        setStudents(dataDetail.students || []);
       } catch (err: any) {
         setError(err.message);
       } finally {
         setLoading(false);
       }
     };
-
     init();
   }, [classSlug]);
 
@@ -130,10 +96,12 @@ export default function ClassDetailPage() {
         isOpen={isStudentModalOpen}
         onClose={() => setIsStudentModalOpen(false)}
         classroomId={classroomId}
-        onSuccess={() => {
-          // reload only the students list
-          fetchStudents(classroomId);
-        }}
+        onSuccess={() => fetchStudents(classroomId)}
+      />
+
+      <AssignmentsModal
+        isOpen={isAssignModalOpen}
+        onClose={() => setIsAssignModalOpen(false)}
       />
 
       <div className="space-y-6 text-gray-900">
@@ -156,10 +124,16 @@ export default function ClassDetailPage() {
               <ClipboardDocumentListIcon className="w-5 h-5" />
               Nueva tarea
             </button>
+            <button
+              onClick={() => setIsAssignModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+            >
+              <DocumentTextIcon className="w-5 h-5" />
+              Ver tareas
+            </button>
           </div>
         </div>
 
-        {/* Mosaico de estudiantes */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
           {students.map((student: any) => (
             <div
@@ -167,16 +141,14 @@ export default function ClassDetailPage() {
               className="border rounded-lg p-4 border-gray-300 hover:shadow-lg transition-shadow overflow-hidden"
             >
               <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-4">
-                <div className="flex-shrink-0">
-                  <Image
-                    src={`/img/skins/${student.skinSeleccionada}.png`}
-                    alt={`${student.name} skin`}
-                    width={64}
-                    height={64}
-                    priority
-                    className="rounded-full"
-                  />
-                </div>
+                <Image
+                  src={`/img/skins/${student.skinSeleccionada}.png`}
+                  alt={`${student.name} skin`}
+                  width={64}
+                  height={64}
+                  priority
+                  className="rounded-full flex-shrink-0"
+                />
                 <div className="flex-1 min-w-0 text-center sm:text-left">
                   <h3 className="text-lg font-semibold text-gray-900 whitespace-nowrap overflow-hidden">
                     {student.name} {student.lastName}
