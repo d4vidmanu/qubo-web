@@ -7,10 +7,12 @@ import {
   ClipboardDocumentListIcon,
   UserPlusIcon,
   DocumentTextIcon,
+  ChartPieIcon,
 } from "@heroicons/react/24/outline";
 import { CreateHomeworkModal } from "@/components/CreateHomeworkModal";
 import { CreateStudentModal } from "@/components/CreateStudentModal";
 import { AssignmentsModal } from "@/components/AssignmentsModal";
+import { ClassroomStatsModal } from "@/components/ClassroomStatsModal";
 import { StudentStatsModal } from "@/components/StudentStatsModal";
 
 export default function ClassDetailPage() {
@@ -25,8 +27,12 @@ export default function ClassDetailPage() {
   const [isHwModalOpen, setIsHwModalOpen] = useState(false);
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isStatsOpen, setIsStatsOpen] = useState(false);
-  const [statsUser, setStatsUser] = useState<{ id: string; name: string }>({ id: "", name: "" });
+  const [statsUser, setStatsUser] = useState<{ id: string; name: string }>({
+    id: "",
+    name: "",
+  });
 
   const fetchStudents = async (cid: string) => {
     const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
@@ -39,22 +45,26 @@ export default function ClassDetailPage() {
   };
 
   useEffect(() => {
-    if (!classSlug) return setError("Clase no encontrada."), setLoading(false);
+    if (!classSlug) {
+      setError("Clase no encontrada.");
+      setLoading(false);
+      return;
+    }
     (async () => {
       try {
         const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
-        // resolve slug → classroom_id
         const rc = await fetch(
           `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/teacher`,
           { headers: { Authorization: token! } }
         );
         const dc = await rc.json();
-        const found = dc.find((ci: any) =>
-          ci.name
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/\s+/g, "-") === classSlug
+        const found = dc.find(
+          (ci: any) =>
+            ci.name
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[̀-ͯ]/g, "")
+              .replace(/\s+/g, "-") === classSlug
         );
         const cid = found.classroom_id;
         setClassroomId(cid);
@@ -85,6 +95,11 @@ export default function ClassDetailPage() {
       <AssignmentsModal
         isOpen={isAssignModalOpen}
         onClose={() => setIsAssignModalOpen(false)}
+      />
+      <ClassroomStatsModal
+        isOpen={isStatsModalOpen}
+        onClose={() => setIsStatsModalOpen(false)}
+        classroomId={classroomId}
       />
       <StudentStatsModal
         isOpen={isStatsOpen}
@@ -121,6 +136,13 @@ export default function ClassDetailPage() {
               <DocumentTextIcon className="w-5 h-5" />
               Ver tareas
             </button>
+            <button
+              onClick={() => setIsStatsModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-gray-100"
+            >
+              <ChartPieIcon className="w-5 h-5" />
+              Estadísticas
+            </button>
           </div>
         </div>
 
@@ -137,7 +159,7 @@ export default function ClassDetailPage() {
               <div className="flex items-center space-x-4">
                 <Image
                   src={`/img/skins/${s.skinSeleccionada}.png`}
-                  alt=""
+                  alt={`${s.name} skin`}
                   width={64}
                   height={64}
                   priority
