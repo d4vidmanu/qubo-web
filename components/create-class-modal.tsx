@@ -1,3 +1,4 @@
+// components/create-class-modal.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -29,9 +30,7 @@ export function CreateClassModal({
     const name = className.trim();
     if (!name) return;
 
-    // Obtener token de cookie
-    const match = document.cookie.match(/(^|;) *token=([^;]+)/);
-    const token = match?.[2];
+    const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
     if (!token) {
       setError("No se encontró token de autenticación.");
       return;
@@ -39,7 +38,7 @@ export function CreateClassModal({
 
     setLoading(true);
     try {
-      // 1) Crear la clase
+      // 1) Create the class
       const stage = process.env.NEXT_PUBLIC_USER_API_STAGE;
       const classroomUrl = `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${stage}/classrooms/create`;
       const resClass = await fetch(classroomUrl, {
@@ -56,28 +55,28 @@ export function CreateClassModal({
       }
       const classroom_id = dataClass.classroom_id as string;
 
-      // 2) Crear una asignación por defecto
+      // 2) Create default assignment
       const assignmentUrl = `${process.env.NEXT_PUBLIC_ASSIGNMENTS_API_URL}/${stage}/assignments`;
-      const payload = {
-        classroom_id,
-        game_name: classroom_id,
-        level_ids: [],
-      };
-
       await fetch(assignmentUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: token,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          classroom_id,
+          game_name: classroom_id,
+          level_ids: [],
+        }),
       }).then(async (res) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Error creando asignación.");
       });
 
-      // 3) Notificar al padre y cerrar modal
+      // 3) Notify parent and dispatch reload event
       onCreateClass(name);
+      window.dispatchEvent(new Event("classCreated"));
+
       setClassName("");
       onClose();
     } catch (err: any) {

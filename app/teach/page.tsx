@@ -1,56 +1,58 @@
+// app/teach/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ClassCard } from "@/components/class-card";
 
 interface ClassItem {
-  id: string; // Cambié 'classroom_id' por 'id' aquí
+  id: string;
   name: string;
-  students: number; // Número de estudiantes
+  students: number;
 }
 
 export default function TeachDashboard() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const fetchClasses = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
+      if (!token) throw new Error("No token found!");
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/teacher`,
+        {
+          method: "GET",
+          headers: { Authorization: token },
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error fetching classes");
+
+      const mapped: ClassItem[] = data.map((c: any) => ({
+        id: c.classroom_id,
+        name: c.name,
+        students: c.students.length,
+      }));
+      setClasses(mapped);
+    } catch (err: any) {
+      setError(err.message || "Error al cargar las clases.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchClasses = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const token = document.cookie.match(/(^|;) *token=([^;]+)/)?.[2];
-        if (!token) throw new Error("No token found!");
-
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_CLASSROOM_API_URL}/${process.env.NEXT_PUBLIC_USER_API_STAGE}/classrooms/teacher`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: token,
-            },
-          }
-        );
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Error fetching classes");
-
-        // Cambié classroom_id por id y calculé students como la longitud del array
-        const classesWithStudents = data.map((classItem: any) => ({
-          id: classItem.classroom_id, // Cambié 'classroom_id' por 'id'
-          name: classItem.name,
-          students: classItem.students.length, // Número de estudiantes
-        }));
-
-        setClasses(classesWithStudents);
-      } catch (err: any) {
-        setError(err.message || "Error al cargar las clases.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchClasses();
-  }, []);
+    const onCreated = () => fetchClasses();
+    window.addEventListener("classCreated", onCreated);
+    return () => {
+      window.removeEventListener("classCreated", onCreated);
+    };
+  }, [fetchClasses]);
 
   return (
     <div className="space-y-6">

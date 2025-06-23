@@ -210,8 +210,8 @@ export function CreateHomeworkModal({
               disabled={loading}
             >
               <option value="">-- Selecciona un juego --</option>
-              <option value="GameJump">SaltoClave</option>
-              <option value="QJ_1-1">RiosSplash</option>
+              <option value="GameJump">Salto Clave</option>
+              <option value="QJ_1-1">Rio Splash</option>
             </select>
           </div>
 
